@@ -1,0 +1,25 @@
+{
+  "name": "se2",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint src",
+    "dev": "ts-node-dev --respawn src/index.ts",
+    "prebuild": "rm -rf dist",
+    "build": "tsc",
+    "postbuild": "echo \"Finished build with size: $(du -sh dir | cut -f1)\"",
+    "prestart": "npm run build",
+    "start": "node dir/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1"
+  }
+}
