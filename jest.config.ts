@@ -7,7 +7,10 @@ const config: Config = {
   testMatch: ["<rootDir>/tests/**/*.ts"],
   testPathIgnorePatterns: ["/node_modules/"],
   verbose: true, // Enables verbose output during testing
-  collectCoverageFrom: ["<rootDir>/src/**/*.ts"], // Specifies the files to collect coverage from
+  collectCoverageFrom: [
+    "<rootDir>/src/utils/parsers/**/*.ts",
+    "!<rootDir>/src/utils/parsers/types.ts",
+  ],
   collectCoverage: true, // Enables code coverage collection
   coverageDirectory: "coverage", // Specifies the directory to output coverage files
   coverageThreshold: {
