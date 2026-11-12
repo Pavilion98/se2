@@ -22,4 +22,4 @@ export const parseFile = async (filePath: string): Promise<ParsedData> => {
 export { parseCSV, parseCSVContent } from "./csvParser";
 export { parseJSON } from "./jsonParser";
 export { parseXML } from "./xmlParser";
-export type { JsonValue, ParsedData, XmlObject, XmlValue } from "./types";
+export type { JsonValue, ParsedData, ParsedRecord, XmlObject, XmlValue } from "./types";

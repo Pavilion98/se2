@@ -1,5 +1,6 @@
 import { promises as fs } from "fs";
 import logger from "../logger";
+import { ParsedData, ParsedRecord } from "./types";
 
 const addCSVRow = (
   rows: string[][],
@@ -13,7 +14,7 @@ const addCSVRow = (
   }
 };
 
-export const parseCSVContent = (content: string): string[][] => {
+const parseCSVRows = (content: string): string[][] => {
   if (content.trim() === "") {
     return [];
   }
@@ -70,7 +71,29 @@ export const parseCSVContent = (content: string): string[][] => {
   return rows;
 };
 
-export const parseCSV = async (filePath: string): Promise<string[][]> => {
+const rowsToRecords = (rows: string[][]): ParsedData => {
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const [headers, ...dataRows] = rows;
+
+  return dataRows.map((row) => {
+    const record: ParsedRecord = {};
+
+    headers.forEach((header, index) => {
+      record[header] = row[index] ?? "";
+    });
+
+    return record;
+  });
+};
+
+export const parseCSVContent = (content: string): ParsedData => {
+  return rowsToRecords(parseCSVRows(content));
+};
+
+export const parseCSV = async (filePath: string): Promise<ParsedData> => {
   try {
     const content = await fs.readFile(filePath, { encoding: "utf-8" });
     return parseCSVContent(content);

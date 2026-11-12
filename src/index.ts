@@ -1,5 +1,5 @@
 import path from "path";
-import { parseFile, ParsedData, XmlObject } from "./utils/parsers/parser";
+import { parseFile } from "./utils/parsers/parser";
 import logger from "./utils/logger";
 
 interface ParserDemoFile {
@@ -22,50 +22,30 @@ const demoFiles: ParserDemoFile[] = [
   },
 ];
 
-const isXmlObject = (value: unknown): value is XmlObject => {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-};
-
-const countRecords = (data: ParsedData): number => {
-  if (Array.isArray(data)) {
-    return data.length;
+const countRecords = (data: unknown): number => {
+  if (!Array.isArray(data)) {
+    throw new Error(
+      "Parser returned an unexpected shape; expected an array of records.",
+    );
   }
 
-  if (isXmlObject(data) && isXmlObject(data.data)) {
-    const rows = data.data.row;
-    return Array.isArray(rows) ? rows.length : 1;
-  }
-
-  return 1;
-};
-
-const getSample = (data: ParsedData): unknown => {
-  if (Array.isArray(data)) {
-    return data.slice(0, 3);
-  }
-
-  if (isXmlObject(data) && isXmlObject(data.data)) {
-    const rows = data.data.row;
-    return Array.isArray(rows) ? rows.slice(0, 3) : rows;
-  }
-
-  return data;
+  return data.length;
 };
 
 async function main() {
   for (const demoFile of demoFiles) {
     try {
-      const parsedData = await parseFile(demoFile.filePath);
+      const records = await parseFile(demoFile.filePath);
 
       logger.info(
         "%s parsed %d records.",
         demoFile.label,
-        countRecords(parsedData),
+        countRecords(records),
       );
       logger.info(
         "%s sample:\n%s",
         demoFile.label,
-        JSON.stringify(getSample(parsedData), null, 2),
+        JSON.stringify(records.slice(0, 3), null, 2),
       );
     } catch (error) {
       logger.error("Failed to parse %s: %o", demoFile.label, error);

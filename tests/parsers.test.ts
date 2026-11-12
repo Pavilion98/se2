@@ -7,7 +7,7 @@ import { parseXML, parseXMLContent } from "../src/utils/parsers/xmlParser";
 const dataDirectory = path.resolve(__dirname, "../src/data");
 
 describe("CSV parser", () => {
-  it("parses quoted fields and commas correctly", () => {
+  it("skips the header row and maps each row to an object", () => {
     const csv = [
       '"id","name","note"',
       '"1","Alice","hello, world"',
@@ -15,22 +15,28 @@ describe("CSV parser", () => {
     ].join("\n");
 
     expect(parseCSVContent(csv)).toEqual([
-      ["id", "name", "note"],
-      ["1", "Alice", "hello, world"],
-      ["2", "Bob", 'He said "hi"'],
+      { id: "1", name: "Alice", note: "hello, world" },
+      { id: "2", name: "Bob", note: 'He said "hi"' },
     ]);
   });
 
-  it("parses the cake orders file", async () => {
+  it("parses the cake orders file into records without the header", async () => {
     const rows = await parseCSV(path.join(dataDirectory, "cake orders.csv"));
 
-    expect(rows.length).toBeGreaterThan(1);
-    expect(rows[0][0]).toBe("id");
-    expect(rows[1][1]).toBe("Sponge");
+    expect(rows).toHaveLength(263);
+    expect(rows[0]).toMatchObject({
+      id: "0",
+      Type: "Sponge",
+      Flavor: "Vanilla",
+    });
   });
 
   it("returns an empty array for empty CSV content", () => {
     expect(parseCSVContent("")).toEqual([]);
+  });
+
+  it("returns an empty array when CSV only contains a header", () => {
+    expect(parseCSVContent('"id","name"')).toEqual([]);
   });
 
   it("throws a helpful error for malformed CSV content", () => {
@@ -41,7 +47,7 @@ describe("CSV parser", () => {
 });
 
 describe("JSON parser", () => {
-  it("parses JSON values while preserving data types", () => {
+  it("parses JSON objects while preserving nested data types", () => {
     expect(
       parseJSONContent(
         JSON.stringify({
@@ -53,25 +59,22 @@ describe("JSON parser", () => {
           discount: null,
         }),
       ),
-    ).toEqual({
-      title: "Clean Code",
-      price: 42,
-      available: true,
-      formats: ["hardcover", "ebook"],
-      metadata: { pages: 464, signed: false },
-      discount: null,
-    });
+    ).toEqual([
+      {
+        title: "Clean Code",
+        price: 42,
+        available: true,
+        formats: ["hardcover", "ebook"],
+        metadata: { pages: 464, signed: false },
+        discount: null,
+      },
+    ]);
   });
 
   it("parses the book orders file", async () => {
     const orders = await parseJSON(path.join(dataDirectory, "book orders.json"));
 
     expect(Array.isArray(orders)).toBe(true);
-
-    if (!Array.isArray(orders)) {
-      throw new Error("Expected book orders to be an array.");
-    }
-
     expect(orders.length).toBeGreaterThan(1);
     expect(orders[0]).toMatchObject({
       "Order ID": "2001",
@@ -88,10 +91,16 @@ describe("JSON parser", () => {
       "Invalid JSON format",
     );
   });
+
+  it("throws a helpful error when JSON is not records", () => {
+    expect(() => parseJSONContent('"just a string"')).toThrow(
+      "JSON must be an object or an array of objects.",
+    );
+  });
 });
 
 describe("XML parser", () => {
-  it("parses nested elements, attributes, entities, and repeated tags", () => {
+  it("parses nested elements, attributes, entities, and repeated tags into records", () => {
     const result = parseXMLContent(`
       <?xml version="1.0"?>
       <store>
@@ -106,31 +115,22 @@ describe("XML parser", () => {
           <title>Toy</title>
         </order>
       </store>
-    `) as unknown as {
-      store: {
-        order: Array<{
-          "@attributes": { id: string };
-          title: string;
-          items?: { item: string[] };
-        }>;
-      };
-    };
+    `);
 
-    expect(result.store.order).toHaveLength(2);
-    expect(result.store.order[0]["@attributes"].id).toBe("1");
-    expect(result.store.order[0].title).toBe("Book & Pen");
-    expect(result.store.order[0].items?.item).toEqual(["Book", "Pen"]);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      "@attributes": { id: "1" },
+      title: "Book & Pen",
+      items: { item: ["Book", "Pen"] },
+    });
+    expect(result[1]).toMatchObject({ title: "Toy" });
   });
 
-  it("parses the toy orders file", async () => {
-    const parsedXml = (await parseXML(
-      path.join(dataDirectory, "toy orders.xml"),
-    )) as unknown as {
-      data: { row: Array<{ OrderID: string; Type: string }> };
-    };
+  it("parses the toy orders file into an array of records", async () => {
+    const rows = await parseXML(path.join(dataDirectory, "toy orders.xml"));
 
-    expect(parsedXml.data.row.length).toBeGreaterThan(1);
-    expect(parsedXml.data.row[0]).toMatchObject({
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows[0]).toMatchObject({
       OrderID: "5001",
       Type: "Plush Toy",
     });
@@ -148,43 +148,36 @@ describe("XML parser", () => {
 });
 
 describe("parser engine", () => {
-  it("routes CSV files by extension", async () => {
+  it("routes CSV files by extension and returns records", async () => {
     const parsedData = await parseFile(
       path.join(dataDirectory, "cake orders.csv"),
     );
 
     expect(Array.isArray(parsedData)).toBe(true);
-
-    if (!Array.isArray(parsedData)) {
-      throw new Error("Expected cake orders to be an array.");
-    }
-
-    const csvRows = parsedData as string[][];
-
-    expect(csvRows[0][0]).toBe("id");
+    expect(parsedData[0]).toMatchObject({ id: "0", Type: "Sponge" });
   });
 
-  it("routes JSON files by extension", async () => {
+  it("routes JSON files by extension and returns records", async () => {
     const parsedData = await parseFile(
       path.join(dataDirectory, "book orders.json"),
     );
 
     expect(Array.isArray(parsedData)).toBe(true);
+    expect(parsedData[0]).toMatchObject({ "Order ID": "2001" });
   });
 
-  it("routes XML files by extension", async () => {
-    const parsedData = (await parseFile(
+  it("routes XML files by extension and returns records", async () => {
+    const parsedData = await parseFile(
       path.join(dataDirectory, "toy orders.xml"),
-    )) as unknown as {
-      data: { row: Array<{ OrderID: string }> };
-    };
+    );
 
-    expect(parsedData.data.row[0].OrderID).toBe("5001");
+    expect(Array.isArray(parsedData)).toBe(true);
+    expect(parsedData[0]).toMatchObject({ OrderID: "5001" });
   });
 
   it("rejects unsupported file extensions", async () => {
-    await expect(parseFile(path.join(dataDirectory, "orders.txt"))).rejects.toThrow(
-      "Unsupported file format",
-    );
+    await expect(
+      parseFile(path.join(dataDirectory, "orders.txt")),
+    ).rejects.toThrow("Unsupported file format");
   });
 });

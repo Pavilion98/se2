@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import logger from "../logger";
-import { XmlObject, XmlValue } from "./types";
+import { isRecord, ParsedData, ParsedRecord, XmlObject, XmlValue } from "./types";
 
 interface OpenElement {
   name: string;
@@ -130,7 +130,61 @@ const appendCompletedElement = (
   root[element.name] = value;
 };
 
-export const parseXMLContent = (content: string): XmlObject => {
+const toRecord = (value: XmlValue): ParsedRecord => {
+  if (isRecord(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return { value };
+  }
+
+  throw new Error("XML does not contain records.");
+};
+
+const extractRecords = (parsed: XmlObject): ParsedData => {
+  const rootKeys = Object.keys(parsed);
+
+  if (rootKeys.length === 0) {
+    return [];
+  }
+
+  if (rootKeys.length > 1) {
+    return [parsed];
+  }
+
+  const rootValue = parsed[rootKeys[0]];
+
+  if (Array.isArray(rootValue)) {
+    return rootValue.map(toRecord);
+  }
+
+  if (rootValue === "" || (isRecord(rootValue) && Object.keys(rootValue).length === 0)) {
+    return [];
+  }
+
+  if (!isRecord(rootValue)) {
+    throw new Error("XML does not contain records.");
+  }
+
+  const childKeys = Object.keys(rootValue);
+
+  if (childKeys.length === 1) {
+    const onlyChild = rootValue[childKeys[0]];
+
+    if (Array.isArray(onlyChild)) {
+      return onlyChild.map(toRecord);
+    }
+
+    if (isRecord(onlyChild)) {
+      return [onlyChild];
+    }
+  }
+
+  return [rootValue];
+};
+
+export const parseXMLContent = (content: string): ParsedData => {
   if (content.trim() === "") {
     throw new Error("XML file is empty.");
   }
@@ -197,10 +251,10 @@ export const parseXMLContent = (content: string): XmlObject => {
     throw new Error("XML does not contain a root element.");
   }
 
-  return root;
+  return extractRecords(root);
 };
 
-export const parseXML = async (filePath: string): Promise<XmlObject> => {
+export const parseXML = async (filePath: string): Promise<ParsedData> => {
   try {
     const content = await fs.readFile(filePath, { encoding: "utf-8" });
     return parseXMLContent(content);
